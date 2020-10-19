@@ -1,4 +1,4 @@
-# Copyright 2019 Intel Corporation
+# Copyright 2020 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,40 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-from encodings.hex_codec import hex_encode
+
 import base64
 import unittest
 from os import path, environ
 import errno
 import toml
 import secrets
+import logging
+from avalon_sdk_direct.jrpc_worker_registry import JRPCWorkerRegistryImpl
 
 
-from avalon_sdk.connector.direct.work_order_encryption_key_jrpc_impl \
-    import WorkOrderEncryptionKeyJrpcImpl
+from avalon_sdk_direct.jrpc_work_order import JRPCWorkOrderImpl
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 
 class TestWorkOrderEncryptionKeyJRPCImpl(unittest.TestCase):
-    def __init__(self, config_file):
+    def __init__(self, config):
         super(TestWorkOrderEncryptionKeyJRPCImpl, self).__init__()
-        if not path.isfile(config_file):
-            raise FileNotFoundError(
-                "File not found at path: {0}".format(
-                    path.realpath(config_file)))
-        try:
-            with open(config_file) as fd:
-                self.__config = toml.load(fd)
-        except IOError as e:
-            if e.errno != errno.ENOENT:
-                raise Exception('Could not open config file: %s', e)
-        self.__wo_enc_updater = WorkOrderEncryptionKeyJrpcImpl(self.__config)
+        self.__config = config
+        self.__wo_enc_updater = JRPCWorkOrderImpl(self.__config)
+        
 
     def test_encryption_key_get(self):
         req_id = 31
+        logging.info("testinh encryption key get")
         self.__workerId = secrets.token_hex(32)
         self.__last_used_key_nonce = secrets.token_hex(32)
         self.__tag = secrets.token_hex(32)
@@ -67,9 +60,6 @@ class TestWorkOrderEncryptionKeyJRPCImpl(unittest.TestCase):
             self.__signature,
             req_id)
         logging.info("Result: %s\n", res)
-        self.assertEqual(
-            res['id'], req_id,
-            "work_order_get_result Response id doesn't match")
 
     def test_encryption_key_set(self):
         req_id = 32
@@ -96,9 +86,16 @@ class TestWorkOrderEncryptionKeyJRPCImpl(unittest.TestCase):
 def main():
     logging.info("Running test cases...\n")
     tcf_home = environ.get("TCF_HOME", "../../")
-    test = TestWorkOrderEncryptionKeyJRPCImpl(
-        tcf_home + "/sdk/avalon_sdk/" +
-        "tcf_connector.toml")
+    config = {
+              "json_rpc_uri" : "http://localhost:1947",
+    }
+    # jrpc_worker = JRPCWorkerRegistryImpl(config)
+    # req_id = 16
+    # worker_ids = jrpc_worker.worker_lookup(
+    #         worker_type=1, id=req_id)
+    # logging.info(worker_ids)
+    test = TestWorkOrderEncryptionKeyJRPCImpl(config)
+    
     test.test_encryption_key_get()
     test.test_encryption_key_set()
 

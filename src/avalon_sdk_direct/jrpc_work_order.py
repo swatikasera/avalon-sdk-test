@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import json
 import time
-import logging
-from utility.hex_utils import is_valid_hex_str
-from http_client.http_jrpc_client import HttpJrpcClient
-from avalon_sdk.connector.interfaces.work_order import WorkOrder
-from error_code.error_status import WorkOrderStatus, JRPCErrorCodes
+from enums.error_code import WorkOrderStatus
+from handler.http_jrpc_client import HttpJrpcClient
+from interfaces.work_order import WorkOrder
+from exceptions.invalid_parameter import InvalidParamException
+from validation.argument_validator import ArgumentValidator
+from validation.json_validator import JsonValidator
+from handler.error_handler import error_handler
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -26,14 +29,16 @@ logging.basicConfig(
 
 class JRPCWorkOrderImpl(WorkOrder):
     """
-    This class is for to manage to the work orders from client side.
+    This class is to manage to the work orders from client side.
     """
 
     def __init__(self, config):
-        self.__uri_client = HttpJrpcClient(config["tcf"]["json_rpc_uri"])
+        self.__uri_client = HttpJrpcClient(config["json_rpc_uri"])
+        self.validation = ArgumentValidator()
 
-    def work_order_submit(self, work_order_id, worker_id,
-                          requester_id, work_order_request, id=None):
+
+    @error_handler
+    def work_order_submit(self, work_order_request, id=None):
         """
         Submit a work order request to an Avalon listener.
 
@@ -44,17 +49,26 @@ class JRPCWorkOrderImpl(WorkOrder):
         work_order_request Work order request in JSON RPC string format
         id                Optional JSON RPC request ID
         """
+        
+        # JSON Validation
+        JsonValidator.json_validation(id, "WorkOrderSubmit", json.loads(work_order_request))
+
+        work_order_req_json = json.loads(work_order_request)
+        # Argument validation
+        self.validation.not_null(id, work_order_req_json)
+
         json_rpc_request = {
             "jsonrpc": "2.0",
             "method": "WorkOrderSubmit",
             "id": id
         }
-        json_rpc_request["params"] = json.loads(work_order_request)
+        json_rpc_request["params"] = work_order_req_json
 
-        logging.debug("Work order request %s", json.dumps(json_rpc_request))
+        logging.info("Work order request %s", json_rpc_request)
         response = self.__uri_client._postmsg(json.dumps(json_rpc_request))
         return response
 
+    @error_handler
     def work_order_get_result_nonblocking(self, work_order_id, id=None):
         """
         Get the work order result in non-blocking way.
@@ -66,6 +80,9 @@ class JRPCWorkOrderImpl(WorkOrder):
         Returns:
         JSON RPC response of dictionary type
         """
+        # Argument validation
+        self.validation.not_null(id, work_order_id)
+
         json_rpc_request = {
             "jsonrpc": "2.0",
             "method": "WorkOrderGetResult",
@@ -77,6 +94,7 @@ class JRPCWorkOrderImpl(WorkOrder):
         response = self.__uri_client._postmsg(json.dumps(json_rpc_request))
         return response
 
+    @error_handler
     def work_order_get_result(self, work_order_id, id=None):
         """
         Get the work order result in a blocking way until it gets a
@@ -89,6 +107,8 @@ class JRPCWorkOrderImpl(WorkOrder):
         Returns:
         JSON RPC response of dictionary type
         """
+        self.validation.not_null(id, work_order_id)
+
         response = self.work_order_get_result_nonblocking(work_order_id, id)
         if "error" in response:
             if response["error"]["code"] != WorkOrderStatus.PENDING:
@@ -107,6 +127,7 @@ class JRPCWorkOrderImpl(WorkOrder):
         else:
             return response
 
+    @error_handler
     def encryption_key_get(self, worker_id, requester_id,
                            last_used_key_nonce=None, tag=None,
                            signature_nonce=None, signature=None, id=None):
@@ -133,6 +154,8 @@ class JRPCWorkOrderImpl(WorkOrder):
                             last_used_key_nonce, tag, and signature_nonce.
         id                  Optional JSON RPC request ID
         """
+        self.validation.not_null(id, worker_id, requester_id)
+        
         json_rpc_request = {
             "jsonrpc": "2.0",
             "method": "EncryptionKeyGet",
@@ -149,6 +172,7 @@ class JRPCWorkOrderImpl(WorkOrder):
         response = self.__uri_client._postmsg(json.dumps(json_rpc_request))
         return response
 
+    @error_handler
     def encryption_key_set(self, worker_id, encryption_key, encryption_nonce,
                            tag, signature_nonce, signature, id=None):
         """
@@ -169,12 +193,5 @@ class JRPCWorkOrderImpl(WorkOrder):
         JRPC response with the result of the operation.
         """
         # Not supported for direct model.
-        return {
-            "jsonrpc": "2.0",
-            "method": "EncryptionKeySet",
-            "id": id,
-            "result": {
-                "code": JRPCErrorCodes.INVALID_PARAMETER_FORMAT_OR_VALUE,
-                "message": "Unsupported method"
-            }
-        }
+        message = "Operation is not supported"
+        raise InvalidParamException(message, id)
