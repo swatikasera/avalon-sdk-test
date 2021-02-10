@@ -29,10 +29,11 @@ pip install dist/avalon_sdk_direct-0.0.1-py3-none-any.whl
 # make
 # pip install dist/avalon_sdk_direct-0.0.4-py3-none-any.whl
 
-#cd avalon_sdk_direct/unit_tests
+cd avalon_sdk_direct/unit_tests
+python test_work_order_receipt_jrpc_impl.py
 # python test_work_order_encryption_key_jrpc_impl.py
 # python test_work_order_jrpc_impl.py
-#python test_worker_registry_jrpc_impl.py
+# python test_worker_registry_jrpc_impl.py
 cd ../generic_client
 python generic_client.py -o --uri "http://localhost:1947" --workload_id "echo-result" --in_data "Hello" --worker_id "singleton-worker-1"
 

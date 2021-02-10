@@ -14,13 +14,15 @@
 
 import json
 import logging
-from utility.hex_utils import is_valid_hex_str
+#from utility.hex_utils import is_valid_hex_str
 
-from http_client.http_jrpc_client import HttpJrpcClient
-from avalon_sdk.connector.interfaces.work_order_receipt \
-    import WorkOrderReceipt
-from avalon_sdk.work_order_receipt.work_order_receipt \
-    import ReceiptCreateStatus
+from handler.http_jrpc_client import HttpJrpcClient
+from interfaces.work_order_receipt import WorkOrderReceipt
+from exceptions.invalid_parameter import InvalidParamException
+from validation.argument_validator import ArgumentValidator
+from validation.json_validator import JsonValidator
+from handler.error_handler import error_handler
+#from avalon_sdk.work_order_receipt.work_order_receipt import ReceiptCreateStatus
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -32,8 +34,10 @@ class JRPCWorkOrderReceiptImpl(WorkOrderReceipt):
     to manage work order receipts from the client side.
     """
     def __init__(self, config):
-        self.__uri_client = HttpJrpcClient(config["tcf"]["json_rpc_uri"])
+        self.__uri_client = HttpJrpcClient(config["json_rpc_uri"])
+        self.validation = ArgumentValidator()
 
+    @error_handler
     def work_order_receipt_create(
             self, work_order_id,
             worker_service_id,
@@ -64,6 +68,8 @@ class JRPCWorkOrderReceiptImpl(WorkOrderReceipt):
         receipt_verification_key Receipt verification key
         id                       Optional JSON RPC request ID
         """
+
+
         json_rpc_request = {
             "jsonrpc": "2.0",
             "method": "WorkOrderReceiptCreate",
@@ -81,6 +87,8 @@ class JRPCWorkOrderReceiptImpl(WorkOrderReceipt):
                 "receiptVerificationKey": receipt_verification_key
             }
         }
+        
+        JsonValidator.json_validation(id,"WorkOrderReceiptCreate", json_rpc_request["params"])
         response = self.__uri_client._postmsg(json.dumps(json_rpc_request))
         return response
 

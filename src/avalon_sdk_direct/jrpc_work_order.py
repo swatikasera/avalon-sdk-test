@@ -48,14 +48,13 @@ class JRPCWorkOrderImpl(WorkOrder):
         requester_id      Requester ID
         work_order_request Work order request in JSON RPC string format
         id                Optional JSON RPC request ID
-        """
+        """       
         
-        # JSON Validation
-        JsonValidator.json_validation(id, "WorkOrderSubmit", json.loads(work_order_request))
+        
+        # Argument validation
+        self.validation.not_null(id, work_order_request)
 
         work_order_req_json = json.loads(work_order_request)
-        # Argument validation
-        self.validation.not_null(id, work_order_req_json)
 
         json_rpc_request = {
             "jsonrpc": "2.0",
@@ -63,6 +62,9 @@ class JRPCWorkOrderImpl(WorkOrder):
             "id": id
         }
         json_rpc_request["params"] = work_order_req_json
+
+        # JSON Validation
+        JsonValidator.json_validation(id, "WorkOrderSubmit", json.loads(work_order_request))
 
         logging.info("Work order request %s", json_rpc_request)
         response = self.__uri_client._postmsg(json.dumps(json_rpc_request))
